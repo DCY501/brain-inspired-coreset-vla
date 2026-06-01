@@ -7,6 +7,7 @@
 """
 import numpy as np
 from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
 from config import *
 
 
@@ -68,7 +69,16 @@ class BrainInspiredCoresetSelector:
         n = len(features)
         target_size = max(1, int(n * self.target_ratio))
         
-        scores, labels = self.compute_diversity_scores(features)
+        # PCA 降维（仅用于聚类，不改变原始特征用于训练）
+        if PCA_N_COMPONENTS and PCA_N_COMPONENTS < features.shape[1]:
+            pca = PCA(n_components=PCA_N_COMPONENTS, random_state=42)
+            features_pca = pca.fit_transform(features)
+            print(f"[PCA] Reduced {features.shape[1]}d -> {features_pca.shape[1]}d "
+                  f"(explained variance: {np.sum(pca.explained_variance_ratio_)*100:.1f}%)")
+        else:
+            features_pca = features
+        
+        scores, labels = self.compute_diversity_scores(features_pca)
         
         selected = set()
         for c in np.unique(labels):
