@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+venv/
+.env/
+
+# Data & model artifacts (large files)
+data/features/*.npy
+data/processed/*.pt
+data/processed/*.json
+data/raw/
+hf_cache/
+model_cache/
+
+# Legacy archive (optional, can be included if small)
+# resnet18_legacy/
+
+# Reports (images are OK, but keep repo small)
+# report/*.png
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
