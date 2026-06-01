@@ -1,33 +1,53 @@
-# Python
+# ==================== Python ====================
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+.Python
 
-# Virtual environments
+# ==================== Virtual Environments ====================
 venv/
 .env/
+env/
+ENV/
 
-# Data & model artifacts (large files)
+# ==================== Data & Model Artifacts ====================
+# 大文件：离线特征、模型权重、原始数据集
 data/features/*.npy
 data/processed/*.pt
+data/processed/*.pth
+data/processed/*.ckpt
 data/processed/*.json
 data/raw/
+
+# HuggingFace / 模型缓存
 hf_cache/
 model_cache/
 
-# Legacy archive (optional, can be included if small)
-# resnet18_legacy/
-
-# Reports (images are OK, but keep repo small)
-# report/*.png
-
-# IDE
-.vscode/
-.idea/
+# ==================== Logs & Temp ====================
+*.log
+*.tmp
+*.temp
 *.swp
 *.swo
+*~
 
-# OS
+# ==================== IDE & Tools ====================
+.vscode/
+.idea/
+*.sublime-*
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Testing
+.pytest_cache/
+htmlcov/
+.coverage
+.mypy_cache/
+
+# ==================== OS ====================
 .DS_Store
 Thumbs.db
+desktop.ini
+Desktop.ini
