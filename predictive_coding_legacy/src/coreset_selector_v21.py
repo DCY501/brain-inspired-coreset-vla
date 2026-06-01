@@ -17,6 +17,7 @@
 import numpy as np
 from sklearn.cluster import KMeans
 from config import *
+from predictive_coding import PredictiveCodingScorer
 
 
 class BrainInspiredCoresetSelector:
@@ -27,7 +28,11 @@ class BrainInspiredCoresetSelector:
     def __init__(self,
                  target_ratio: float = CORESET_RATIO,
                  temporal_weight: float = TEMPORAL_WEIGHT,
-                 diversity_weight: float = DIVERSITY_WEIGHT):
+                 diversity_weight: float = DIVERSITY_WEIGHT,
+                 use_predictive_coding: bool = False,
+                 pc_window: int = 7,
+                 pc_alpha: float = 1.0,
+                 pc_mode: str = 'strict'):
         """
         Args:
             target_ratio: 目标筛选比例（如 0.1 = 10%）
@@ -37,10 +42,28 @@ class BrainInspiredCoresetSelector:
         self.target_ratio = target_ratio
         self.temporal_weight = temporal_weight
         self.diversity_weight = diversity_weight
+        self.use_predictive_coding = use_predictive_coding
+        self.pc_scorer = PredictiveCodingScorer(window_size=pc_window, alpha=pc_alpha, mode=pc_mode) if use_predictive_coding else None
+    
+    def compute_predictive_coding_scores(self, features: np.ndarray, actions: np.ndarray, episode_indices: np.ndarray):
+        """
+        计算预测编码 surprise 得分（v2.1 真正 Predictive Coding）
+        原理：用前 W 帧视觉特征预测当前动作，预测误差越大 -> 信息价值越高
+        
+        Args:
+            features: np.ndarray, shape=(N, D), 视觉特征
+            actions:  np.ndarray, shape=(N, 7), 单臂动作
+            episode_indices: np.ndarray, shape=(N,), episode 编号
+        Returns:
+            scores: np.ndarray, shape=(N,), 值域 [0, 1]
+        """
+        if self.pc_scorer is None:
+            raise RuntimeError("PredictiveCodingScorer not initialized. Set use_predictive_coding=True.")
+        return self.pc_scorer.compute_scores(features, actions, episode_indices)
     
     def compute_temporal_scores(self, actions: np.ndarray, episode_indices: np.ndarray):
         """
-        计算时序重要性得分（对应 Predictive Coding 机制）
+        计算时序重要性得分（v2.0 启发式差分，向后兼容）
         原理：相邻帧动作差异越大 -> 预测误差越大 -> 信息价值越高
         
         Args:
@@ -134,7 +157,10 @@ class BrainInspiredCoresetSelector:
         target_size = max(1, int(n * self.target_ratio))
         
         # 1. 时序重要性得分（Predictive Coding -> 去除发呆帧）
-        t_scores = self.compute_temporal_scores(actions, episode_indices)
+        if self.use_predictive_coding:
+            t_scores = self.compute_predictive_coding_scores(features, actions, episode_indices)
+        else:
+            t_scores = self.compute_temporal_scores(actions, episode_indices)
         
         # 2. 分布多样性得分（RAS + 均衡 -> 防止简单动作过拟合）
         d_scores, labels = self.compute_diversity_scores(features)

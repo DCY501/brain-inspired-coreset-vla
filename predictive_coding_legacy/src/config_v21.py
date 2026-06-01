@@ -53,3 +53,9 @@ CORESET_RATIO = 0.1                       # Coreset: 筛选 10% 训练帧
 # ==================== 核心集选择算法配置 ====================
 TEMPORAL_WEIGHT = 0.6                     # 时序得分权重 (Predictive Coding)
 DIVERSITY_WEIGHT = 0.4                    # 分布得分权重 (RAS + 均衡)
+
+# ==================== 预测编码配置 (v2.1) ====================
+USE_PREDICTIVE_CODING = True              # 是否启用真正的滑动窗口预测编码
+PREDICTIVE_CODING_WINDOW = 3              # 滑动窗口大小（帧）
+PREDICTIVE_CODING_ALPHA = 1.0             # Ridge 回归正则化强度
+PREDICTIVE_CODING_MODE = 'fast'           # 'strict'=逐帧 leave-one-out; 'fast'=全局残差

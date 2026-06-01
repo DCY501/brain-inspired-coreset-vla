@@ -59,7 +59,11 @@ def run_single_coreset(seed: int = RANDOM_SEED):
     selector = BrainInspiredCoresetSelector(
         target_ratio=CORESET_RATIO,
         temporal_weight=TEMPORAL_WEIGHT,
-        diversity_weight=DIVERSITY_WEIGHT
+        diversity_weight=DIVERSITY_WEIGHT,
+        use_predictive_coding=USE_PREDICTIVE_CODING,
+        pc_window=PREDICTIVE_CODING_WINDOW,
+        pc_alpha=PREDICTIVE_CODING_ALPHA,
+        pc_mode=PREDICTIVE_CODING_MODE
     )
     coreset_idx = selector.select(visual_train, y_train_full, ep_train)
     
@@ -92,8 +96,9 @@ def run_single_coreset(seed: int = RANDOM_SEED):
     print("\n[Results] Coreset Test MSE: {:.6f} | MAE: {:.6f}".format(results['mse'], results['mae']))
     
     # ---------- 保存结果 ----------
+    method_tag = 'brain_inspired_coreset_clip_v21' if USE_PREDICTIVE_CODING else 'brain_inspired_coreset_clip'
     result_dict = {
-        'method': 'brain_inspired_coreset_clip',
+        'method': method_tag,
         'seed': seed,
         'test_mse': results['mse'],
         'test_mae': results['mae'],
@@ -104,7 +109,11 @@ def run_single_coreset(seed: int = RANDOM_SEED):
         'history': {k: [float(v) for v in vals] for k, vals in history.items()}
     }
     
-    out_path = os.path.join(PROCESSED_DIR, f"coreset_result_seed{seed}.json")
+    if USE_PREDICTIVE_CODING:
+        out_name = f"coreset_v21_{PREDICTIVE_CODING_MODE}_w{PREDICTIVE_CODING_WINDOW}_result_seed{seed}.json"
+    else:
+        out_name = f"coreset_result_seed{seed}.json"
+    out_path = os.path.join(PROCESSED_DIR, out_name)
     with open(out_path, 'w') as f:
         json.dump(result_dict, f, indent=2)
     print(f"[Saved] {out_path}")
