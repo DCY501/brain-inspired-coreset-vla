@@ -70,7 +70,8 @@ def run_single_coreset(seed: int = RANDOM_SEED):
     test_loader = DataLoader(FeatureDataset(X_test, y_test), batch_size=BATCH_SIZE_TRAIN)
     
     model = MLPRegressor(input_dim=X.shape[1], output_dim=y.shape[1])
-    save_path = os.path.join(PROCESSED_DIR, f"coreset_seed{seed}.pt")
+    pca_tag = f"_pca{PCA_N_COMPONENTS}" if PCA_N_COMPONENTS else ""
+    save_path = os.path.join(PROCESSED_DIR, f"coreset{pca_tag}_seed{seed}.pt")
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model, history = train_model(model, train_loader, val_loader, save_path=save_path, device=device)
     
@@ -90,7 +91,7 @@ def run_single_coreset(seed: int = RANDOM_SEED):
         'history': {k: [float(v) for v in vals] for k, vals in history.items()}
     }
     
-    out_path = os.path.join(PROCESSED_DIR, f"coreset_result_seed{seed}.json")
+    out_path = os.path.join(PROCESSED_DIR, f"coreset{pca_tag}_result_seed{seed}.json")
     with open(out_path, 'w') as f:
         json.dump(result_dict, f, indent=2)
     print(f"[Saved] {out_path}")
