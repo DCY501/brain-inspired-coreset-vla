@@ -20,6 +20,12 @@ from evaluate import evaluate_model
 
 def run_single_coreset(seed: int = RANDOM_SEED):
     """运行一次核心集实验"""
+    # 固定所有随机源，保证结果可复现
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    
     print("\n" + "=" * 60)
     print(f"Coreset Experiment | Seed = {seed}")
     print("=" * 60)

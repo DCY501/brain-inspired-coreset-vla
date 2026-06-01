@@ -45,4 +45,4 @@ RANDOM_SEED = 42
 TEST_EPISODE_RATIO = 0.2
 BASELINE_SAMPLE_RATIO = 0.1
 CORESET_RATIO = 0.1
-PCA_N_COMPONENTS = None                   # PCA 降维维度（仅用于核心集选择），None 表示不降维
+PCA_N_COMPONENTS = 400                    # PCA 降维维度

@@ -56,9 +56,13 @@ class BrainInspiredCoresetSelector:
         
         return scores, labels
     
+    def _get_cluster_quota(self, cluster_size: int):
+        """动态保底：大簇多保底，小簇少保底"""
+        return max(1, min(3, cluster_size // 50 + 1))
+    
     def select(self, features: np.ndarray, episode_indices: np.ndarray):
         """
-        执行核心集选择
+        执行核心集选择（动态保底版本）
         
         Args:
             features: np.ndarray, shape=(N, D), 视觉特征
@@ -80,21 +84,28 @@ class BrainInspiredCoresetSelector:
         
         scores, labels = self.compute_diversity_scores(features_pca)
         
+        # 动态保底：按簇大小分配保底名额
         selected = set()
         for c in np.unique(labels):
             idx_in_c = np.where(labels == c)[0]
-            best_idx = idx_in_c[np.argmax(scores[idx_in_c])]
-            selected.add(int(best_idx))
+            quota = self._get_cluster_quota(len(idx_in_c))
+            # 在簇内按得分排序，选前 quota 个
+            sorted_idx = idx_in_c[np.argsort(scores[idx_in_c])[-quota:]]
+            for idx in sorted_idx:
+                selected.add(int(idx))
         
-        remaining = target_size - len(selected)
-        if remaining > 0:
-            unselected = [i for i in range(n) if i not in selected]
-            unselected_scores = scores[unselected]
-            top_local_idx = np.argsort(unselected_scores)[-remaining:]
-            for idx in top_local_idx:
-                selected.add(unselected[idx])
-        elif remaining < 0:
+        # 如果保底超过 target_size，只保留得分最高的 target_size 个
+        if len(selected) > target_size:
             selected = set(np.argsort(scores)[-target_size:])
+        else:
+            # 剩余名额按全局得分补齐
+            remaining = target_size - len(selected)
+            if remaining > 0:
+                unselected = [i for i in range(n) if i not in selected]
+                unselected_scores = scores[unselected]
+                top_local_idx = np.argsort(unselected_scores)[-remaining:]
+                for idx in top_local_idx:
+                    selected.add(unselected[idx])
         
         selected = np.array(sorted(list(selected)), dtype=np.int64)
         

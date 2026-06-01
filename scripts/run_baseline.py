@@ -21,6 +21,11 @@ from evaluate import evaluate_model
 
 def run_single_baseline(seed: int):
     """运行一次 baseline 实验"""
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    
     print("\n" + "=" * 60)
     print(f"Baseline Experiment | Seed = {seed}")
     print("=" * 60)
