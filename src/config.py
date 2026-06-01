@@ -53,3 +53,4 @@ CORESET_RATIO = 0.1                       # Coreset: 筛选 10% 训练帧
 # ==================== 核心集选择算法配置 ====================
 TEMPORAL_WEIGHT = 0.6                     # 时序得分权重 (Predictive Coding)
 DIVERSITY_WEIGHT = 0.4                    # 分布得分权重 (RAS + 均衡)
+CORESET_MODE = 'fusion'                   # 消融实验模式: 'fusion' | 'temporal_only' | 'diversity_only'

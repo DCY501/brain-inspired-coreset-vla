@@ -18,10 +18,18 @@ from train_mlp import MLPRegressor, train_model
 from evaluate import evaluate_model
 
 
-def run_single_coreset(seed: int = RANDOM_SEED):
-    """运行一次核心集实验"""
+def run_single_coreset(seed: int = RANDOM_SEED, mode: str = None):
+    """运行一次核心集实验
+    
+    Args:
+        seed: 随机种子
+        mode: 覆盖 config.CORESET_MODE，用于消融实验
+    """
+    if mode is None:
+        mode = CORESET_MODE
+    
     print("\n" + "=" * 60)
-    print(f"Coreset Experiment | Seed = {seed}")
+    print(f"Coreset Experiment | Seed = {seed} | Mode = {mode}")
     print("=" * 60)
     
     # ---------- 加载 CLIP 多模态特征 ----------
@@ -59,7 +67,8 @@ def run_single_coreset(seed: int = RANDOM_SEED):
     selector = BrainInspiredCoresetSelector(
         target_ratio=CORESET_RATIO,
         temporal_weight=TEMPORAL_WEIGHT,
-        diversity_weight=DIVERSITY_WEIGHT
+        diversity_weight=DIVERSITY_WEIGHT,
+        mode=mode
     )
     coreset_idx = selector.select(visual_train, y_train_full, ep_train)
     
@@ -82,7 +91,7 @@ def run_single_coreset(seed: int = RANDOM_SEED):
     
     # ---------- 训练 MLP（结构与 baseline 完全相同） ----------
     model = MLPRegressor(input_dim=X.shape[1], output_dim=y.shape[1])
-    save_path = os.path.join(PROCESSED_DIR, f"coreset_seed{seed}.pt")
+    save_path = os.path.join(PROCESSED_DIR, f"coreset_{mode}_seed{seed}.pt")
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model, history = train_model(model, train_loader, val_loader, save_path=save_path, device=device)
     
@@ -93,7 +102,7 @@ def run_single_coreset(seed: int = RANDOM_SEED):
     
     # ---------- 保存结果 ----------
     result_dict = {
-        'method': 'brain_inspired_coreset_clip',
+        'method': f'brain_inspired_coreset_{mode}',
         'seed': seed,
         'test_mse': results['mse'],
         'test_mae': results['mae'],
@@ -104,7 +113,7 @@ def run_single_coreset(seed: int = RANDOM_SEED):
         'history': {k: [float(v) for v in vals] for k, vals in history.items()}
     }
     
-    out_path = os.path.join(PROCESSED_DIR, f"coreset_result_seed{seed}.json")
+    out_path = os.path.join(PROCESSED_DIR, f"coreset_{mode}_seed{seed}.json")
     with open(out_path, 'w') as f:
         json.dump(result_dict, f, indent=2)
     print(f"[Saved] {out_path}")

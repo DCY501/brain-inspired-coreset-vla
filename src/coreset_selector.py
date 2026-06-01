@@ -27,16 +27,22 @@ class BrainInspiredCoresetSelector:
     def __init__(self,
                  target_ratio: float = CORESET_RATIO,
                  temporal_weight: float = TEMPORAL_WEIGHT,
-                 diversity_weight: float = DIVERSITY_WEIGHT):
+                 diversity_weight: float = DIVERSITY_WEIGHT,
+                 mode: str = 'fusion'):
         """
         Args:
             target_ratio: 目标筛选比例（如 0.1 = 10%）
             temporal_weight: 时序得分权重
             diversity_weight: 分布得分权重
+            mode: 'fusion' | 'temporal_only' | 'diversity_only'
+                  fusion = 时序 + 分布融合（v3）
+                  temporal_only = 仅时序过滤（v1）
+                  diversity_only = 仅分布过滤（v2）
         """
         self.target_ratio = target_ratio
         self.temporal_weight = temporal_weight
         self.diversity_weight = diversity_weight
+        self.mode = mode
     
     def compute_temporal_scores(self, actions: np.ndarray, episode_indices: np.ndarray):
         """
@@ -133,40 +139,53 @@ class BrainInspiredCoresetSelector:
         n = len(features)
         target_size = max(1, int(n * self.target_ratio))
         
-        # 1. 时序重要性得分（Predictive Coding -> 去除发呆帧）
+        # 1. 计算各得分
         t_scores = self.compute_temporal_scores(actions, episode_indices)
-        
-        # 2. 分布多样性得分（RAS + 均衡 -> 防止简单动作过拟合）
         d_scores, labels = self.compute_diversity_scores(features)
         
-        # 3. 综合得分（加权融合）
-        final_scores = self.temporal_weight * t_scores + self.diversity_weight * d_scores
+        # 2. 根据 mode 确定最终得分和选择策略
+        if self.mode == 'temporal_only':
+            # v1: 仅时序过滤 — 全局 Top-K
+            final_scores = t_scores
+            selected = self._select_topk(final_scores, target_size)
+        elif self.mode == 'diversity_only':
+            # v2: 仅分布过滤 — 保留簇覆盖策略
+            final_scores = d_scores
+            selected = self._select_with_coverage(final_scores, labels, target_size)
+        else:
+            # v3: 融合 — 加权得分 + 簇覆盖
+            final_scores = self.temporal_weight * t_scores + self.diversity_weight * d_scores
+            selected = self._select_with_coverage(final_scores, labels, target_size)
         
-        # 4. 选择策略：
-        #    先保证每个簇至少选 1 帧（分布覆盖），再按全局得分补齐到 target_size
+        selected = np.array(sorted(list(selected)), dtype=np.int64)
+        
+        print(f"[Coreset] Mode: {self.mode} | Selected {len(selected)} frames out of {n} "
+              f"({len(selected)/n*100:.1f}%)")
+        print(f"[Coreset] Coverage: {len(np.unique(episode_indices[selected]))}/"
+              f"{len(np.unique(episode_indices))} episodes")
+        
+        return selected
+    
+    def _select_topk(self, scores: np.ndarray, target_size: int):
+        """全局 Top-K 选取（用于 temporal_only，无聚类标签）"""
+        return set(np.argsort(scores)[-target_size:])
+    
+    def _select_with_coverage(self, scores: np.ndarray, labels: np.ndarray, target_size: int):
+        """簇覆盖 + 全局补齐（用于 diversity_only 和 fusion）"""
         selected = set()
         for c in np.unique(labels):
             idx_in_c = np.where(labels == c)[0]
-            best_idx = idx_in_c[np.argmax(final_scores[idx_in_c])]
+            best_idx = idx_in_c[np.argmax(scores[idx_in_c])]
             selected.add(int(best_idx))
         
-        # 剩余名额按全局分数从高到低补充
         remaining = target_size - len(selected)
         if remaining > 0:
-            unselected = [i for i in range(n) if i not in selected]
-            unselected_scores = final_scores[unselected]
+            unselected = [i for i in range(len(scores)) if i not in selected]
+            unselected_scores = scores[unselected]
             top_local_idx = np.argsort(unselected_scores)[-remaining:]
             for idx in top_local_idx:
                 selected.add(unselected[idx])
         elif remaining < 0:
-            # 如果 target_size 小于聚类数，只保留得分最高的 target_size 个（每个簇的代表）
-            selected = set(np.argsort(final_scores)[-target_size:])
-        
-        selected = np.array(sorted(list(selected)), dtype=np.int64)
-        
-        print(f"[Coreset] Selected {len(selected)} frames out of {n} "
-              f"({len(selected)/n*100:.1f}%)")
-        print(f"[Coreset] Coverage: {len(np.unique(episode_indices[selected]))}/"
-              f"{len(np.unique(episode_indices))} episodes")
+            selected = set(np.argsort(scores)[-target_size:])
         
         return selected
