@@ -1,4 +1,4 @@
-# 思路三-A：自监督重建误差采样 (Autoencoder Reconstruction Error Sampling) 完整历程
+# 思路三：自监督重建误差采样 (Autoencoder Reconstruction Error Sampling) 完整历程
 
 > **核心思想**：训练一个轻量自编码器压缩视觉特征。重建误差大的帧 = 模型"看不懂"的帧 = 信息最丰富。模拟大脑对"意外/难预测"刺激分配更多注意力的机制。
 
