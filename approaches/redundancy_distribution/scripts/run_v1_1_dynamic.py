@@ -1,10 +1,10 @@
 """
-核心集实验脚本
-使用脑启发核心集选择算法筛选 10% 高价值帧 -> 训练 MLP -> 测试集评估 MSE
+v1.1 动态保底实验脚本
+簇大小动态配额 -> 训练 MLP -> 测试集评估 MSE
 """
 import os
 import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', 'src'))
 
 import numpy as np
 import torch
@@ -13,21 +13,20 @@ import json
 
 from config import *
 from data_loader import FeatureDataset
-from coreset_selector import BrainInspiredCoresetSelector
+from approaches.redundancy_distribution.src.selector_v1_1_dynamic import BrainInspiredCoresetSelector
 from train_mlp import MLPRegressor, train_model
 from evaluate import evaluate_model
 
 
 def run_single_coreset(seed: int = RANDOM_SEED):
-    """运行一次核心集实验"""
-    # 固定所有随机源，保证结果可复现
+    """运行一次 v1.1 核心集实验"""
     np.random.seed(seed)
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
     
     print("\n" + "=" * 60)
-    print(f"Coreset Experiment | Seed = {seed}")
+    print(f"Coreset v1.1 (Dynamic Quota) | Seed = {seed}")
     print("=" * 60)
     
     visual_features = np.load(os.path.join(FEATURES_DIR, "clip_visual_features.npy"))
@@ -76,17 +75,19 @@ def run_single_coreset(seed: int = RANDOM_SEED):
     test_loader = DataLoader(FeatureDataset(X_test, y_test), batch_size=BATCH_SIZE_TRAIN)
     
     model = MLPRegressor(input_dim=X.shape[1], output_dim=y.shape[1])
-    pca_tag = f"_pca{PCA_N_COMPONENTS}" if PCA_N_COMPONENTS else ""
-    save_path = os.path.join(PROCESSED_DIR, f"coreset{pca_tag}_seed{seed}.pt")
+    save_path = os.path.join(
+        os.path.dirname(__file__), '..', 'results', 'v1_1_dynamic', f"coreset_v1_1_seed{seed}.pt"
+    )
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model, history = train_model(model, train_loader, val_loader, save_path=save_path, device=device)
     
     results = evaluate_model(model, test_loader, device=device)
     
-    print("\n[Results] Coreset Test MSE: {:.6f} | MAE: {:.6f}".format(results['mse'], results['mae']))
+    print("\n[Results] Coreset v1.1 Test MSE: {:.6f} | MAE: {:.6f}".format(results['mse'], results['mae']))
     
     result_dict = {
-        'method': 'brain_inspired_coreset',
+        'method': 'brain_inspired_coreset_v1.1_dynamic',
         'seed': seed,
         'test_mse': results['mse'],
         'test_mae': results['mae'],
@@ -97,7 +98,9 @@ def run_single_coreset(seed: int = RANDOM_SEED):
         'history': {k: [float(v) for v in vals] for k, vals in history.items()}
     }
     
-    out_path = os.path.join(PROCESSED_DIR, f"coreset{pca_tag}_result_seed{seed}.json")
+    out_path = os.path.join(
+        os.path.dirname(__file__), '..', 'results', 'v1_1_dynamic', f"coreset_v1_1_result_seed{seed}.json"
+    )
     with open(out_path, 'w') as f:
         json.dump(result_dict, f, indent=2)
     print(f"[Saved] {out_path}")
@@ -108,7 +111,7 @@ def run_single_coreset(seed: int = RANDOM_SEED):
 def main():
     res = run_single_coreset(seed=RANDOM_SEED)
     print("\n" + "=" * 60)
-    print(f"Coreset Test MSE: {res['test_mse']:.6f}")
+    print(f"Coreset v1.1 Test MSE: {res['test_mse']:.6f}")
     print("=" * 60)
 
 
