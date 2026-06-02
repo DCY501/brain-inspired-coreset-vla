@@ -113,7 +113,7 @@ def run_single(strategy: str, seed: int = RANDOM_SEED):
 
 
 def main():
-    strategies = ['feature_norm', 'action_delta']
+    strategies = ['local_density']
     all_results = []
     for strategy in strategies:
         res = run_single(strategy=strategy, seed=RANDOM_SEED)

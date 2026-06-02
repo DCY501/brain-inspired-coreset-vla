@@ -52,6 +52,16 @@ class WeightedFPSSelector:
                     d[1:] = np.linalg.norm(ep_actions[1:] - ep_actions[:-1], axis=1)
                     weights[idx] = d
         
+        elif self.weight_strategy == 'local_density':
+            # k-NN 平均距离 = 局部密度指标
+            # 距离大的 = 稀疏区域 = 权重高
+            from sklearn.neighbors import NearestNeighbors
+            k = min(10, n - 1)
+            nbrs = NearestNeighbors(n_neighbors=k + 1, algorithm='auto').fit(features)
+            distances, _ = nbrs.kneighbors(features)
+            # distances[:, 0] 是自身（距离=0），取 k 个真实邻居的平均
+            weights = distances[:, 1:].mean(axis=1)
+        
         elif self.weight_strategy == 'combined':
             w1 = np.linalg.norm(features, axis=1)
             w2 = np.zeros(n)
