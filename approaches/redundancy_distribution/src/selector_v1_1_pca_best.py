@@ -54,9 +54,13 @@ class BrainInspiredCoresetSelector:
         """动态保底：大簇多保底，小簇少保底"""
         return max(1, min(3, cluster_size // 50 + 1))
     
-    def select(self, features: np.ndarray, episode_indices: np.ndarray):
+    def select(self, features: np.ndarray, episode_indices: np.ndarray, n_clusters: int = None):
         """
         执行核心集选择（v1.1 + PCA 400d）
+        Args:
+            features: 视觉特征
+            episode_indices: episode 编号
+            n_clusters: K-Means 聚类数，None 则自动计算（target_size // 3）
         """
         n = len(features)
         target_size = max(1, int(n * self.target_ratio))
@@ -67,7 +71,7 @@ class BrainInspiredCoresetSelector:
         print(f"[PCA] Reduced {features.shape[1]}d -> {features_pca.shape[1]}d "
               f"(explained variance: {np.sum(pca.explained_variance_ratio_)*100:.1f}%)")
         
-        scores, labels = self.compute_diversity_scores(features_pca)
+        scores, labels = self.compute_diversity_scores(features_pca, n_clusters=n_clusters)
         
         # v1.1：动态保底，按簇大小分配名额
         selected = set()

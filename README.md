@@ -30,46 +30,40 @@ PROJECT/
 ├── venv/                           # Python 虚拟环境（已配置好，见下文）
 ├── data/
 │   ├── raw/                        # 原始 ALOHA 数据集（由 lerobot 下载）
-│   │   ├── data/                   # Parquet 表格数据（state, action, episode_index 等）
-│   │   ├── videos/                 # 顶视角视频（observation.images.top）
-│   │   └── meta/                   # 元数据（info.json, tasks.parquet 等）
-│   ├── features/                   # 离线提取的 CLIP 特征（运行后自动生成）
-│   │   ├── clip_visual_features.npy    # (20000, 512) CLIP 视觉特征
+│   ├── features/                   # 离线提取的 CLIP 特征
+│   │   ├── clip_visual_features.npy    # (20000, 768) CLIP 视觉特征
 │   │   ├── clip_text_features.npy      # (20000, 512) CLIP 文本特征
 │   │   ├── actions.npy                 # (20000, 7) 单臂动作标签
-│   │   ├── episode_indices.npy         # (20000,) 每帧所属 episode 编号
-│   │   └── task_names.npy              # 任务名称对照表
-│   ├── processed/                  # 实验输出（运行后自动生成）
-│   │   ├── baseline_seed*.pt       # Baseline 模型权重
-│   │   ├── coreset_seed*.pt        # Coreset 模型权重
-│   │   ├── ablation_*.json         # 消融实验结果
-│   │   ├── baseline_result_*.json  # Baseline 实验结果
-│   │   ├── coreset_result_*.json   # Coreset 实验结果
-│   │   └── baseline_summary.json   # Baseline 汇总统计
-│   └── ablation/                   # 消融实验中间数据
-├── src/                            # 核心源码（不可直接运行，被 scripts 调用）
-│   ├── __init__.py
+│   │   └── episode_indices.npy         # (20000,) 每帧所属 episode 编号
+│   └── processed/                  # 实验输出（运行后自动生成）
+├── src/                            # 公共基础设施（被各思路脚本调用）
 │   ├── config.py                   # 全局常量：路径、超参数、实验配置
 │   ├── data_loader.py              # 封装 lerobot 接口 + 训练/测试划分 + PyTorch Dataset
-│   ├── feature_extractor.py        # CLIP 视觉编码器 + 文本编码器（冻结权重）
-│   ├── baseline.py                 # RandomBaselineSampler：随机抽 10% episode
-│   ├── coreset_selector.py         # BrainInspiredCoresetSelector v2.0
-│   │                               #   - PredictiveCodingTemporalFilter
-│   │                               #   - AdaptiveWeightFusion
-│   │                               #   - TemporalOnlySelector（消融）
-│   │                               #   - DiversityOnlySelector（消融）
 │   ├── train_mlp.py                # MLPRegressor 模型定义 + 训练流程（含早停）
 │   └── evaluate.py                 # 测试集评估：MSE、MAE、每关节误差
-├── scripts/                        # 可执行脚本（按顺序运行）
-│   ├── download_dataset.py         # [可选] 若 data/raw/ 缺失，用此脚本重新下载
-│   ├── extract_features.py         # Step 1: 离线提取 CLIP 多模态特征
-│   ├── run_baseline.py             # Step 2: 运行 Baseline 实验（5 次取平均）
-│   ├── run_ablation.py             # Step 3: 消融实验（Temporal / Diversity / BrainInspired）
-│   ├── run_coreset.py              # Step 4: 运行核心集实验（完整版）
-│   └── compare_results.py          # Step 5: 结果对比与可视化
-├── report/                         # 实验报告图表（运行后自动生成）
-│   └── comparison.png              # 四组 MSE 柱状图 + 学习曲线 + 每关节误差
-├── requirements.txt                # Python 依赖包列表（含 transformers）
+├── approaches/                     # 各思路独立存放（核心集选择算法实验）
+│   ├── redundancy_distribution/    # 思路一：v1.1 + PCA 400d K-Means 聚类
+│   │   ├── src/selector_v1_1_pca_best.py
+│   │   └── results/                # 实验结果 JSON + PT 权重
+│   ├── temporal_awareness/         # 思路二：动作变化率事件边界（已废弃）
+│   ├── autoencoder_reconstruction/ # 思路三：AE 重建误差（已废弃）
+│   ├── farthest_point_sampling/    # 思路四：FPS 系列（密度过滤 FPS 全局最优）
+│   │   ├── src/selector_fps.py
+│   │   ├── src/selector_fps_fast.py
+│   │   ├── src/selector_density_filtered_fps.py
+│   │   └── results/
+│   ├── fusion_score_weighted/      # 融合思路：得分加权 v1（失败）+ 分层融合 v2.0
+│   │   ├── src/selector_score_fusion.py
+│   │   ├── src/selector_hierarchical_fusion.py
+│   │   └── results/
+│   └── README.md                   # 各思路详细说明
+├── scripts/                        # 可执行脚本（特征提取、基线、消融等）
+│   ├── extract_features.py
+│   ├── run_baseline.py
+│   ├── run_ablation.py
+│   └── compare_results.py
+├── report/                         # 实验报告图表
+├── requirements.txt
 └── README.md                       # 本文件
 ```
 
@@ -284,8 +278,8 @@ python compare_results.py
 | `BASELINE_SAMPLE_RATIO` | `0.1` | Baseline 随机抽 10% 训练 episode（4/40） |
 | `CORESET_RATIO` | `0.1` | 核心集筛选 10% 帧（约 1600/16000） |
 | `CLIP_MODEL_NAME` | `"openai/clip-vit-base-patch32"` | CLIP 预训练模型名称 |
-| `FEATURE_DIM` | `1024` | CLIP 视觉(512) + 文本(512) 拼接维度 |
-| `VISUAL_FEATURE_DIM` | `512` | CLIP 视觉特征单独维度（用于分布过滤） |
+| `FEATURE_DIM` | `1280` | CLIP 视觉(768) + 文本(512) 拼接维度 |
+| `VISUAL_FEATURE_DIM` | `768` | CLIP 视觉特征单独维度（用于分布过滤） |
 | `TEMPORAL_WINDOW` | `5` | 预测编码滑动窗口大小 |
 | `TEMPORAL_WEIGHT_ALPHA` | `1.0` | 自适应权重温度系数 |
 | `MLP_HIDDEN_DIMS` | `[512, 256, 128]` | MLP 隐藏层神经元数 |
@@ -305,6 +299,54 @@ python compare_results.py
 3. **多次随机**：Baseline 运行 5 次取平均，排除"恰好抽到好 episode"的随机波动干扰。
 4. **降维合理**：只取单视角 (`observation.images.top`) 和单臂前 7 维动作，符合题目"可选择仅提取其中一个视角和单臂动作标签进行降维实验"的要求。
 5. **消融对照**：设计 Temporal-Only / Diversity-Only / BrainInspired / Random 四组实验，证明混合策略中每个模块的独立贡献。
+
+---
+
+## 📊 实验结果汇总（approaches/ 全部方法）
+
+所有实验在 **相同测试集** 上评估（按 episode 划分，20% 测试集，seed=42），MLP 结构一致。
+
+### 核心集选择方法对比
+
+| 排名 | 方法 | 思路 | Test MSE | Test MAE | 状态 |
+|------|------|------|---------|---------|------|
+| 🥇 | **密度过滤 FPS** | 思路四 | **0.003792** | 0.0339 | ✅ 全局最优 |
+| 🥈 | **v1.1 + PCA 400d** | 思路一 | **0.003835** | — | ✅ 亚军 |
+| 3 | 加权 FPS (feature_norm) | 思路四 | 0.004162 | 0.0353 | ✅ |
+| 4 | 标准 FPS | 思路四 | 0.004294 | 0.0359 | ✅ |
+| 5 | **分层融合 cr2.0** | 融合 v2.0 | **0.004004** | 0.0349 | ✅ |
+| 6 | **分层融合 cr3.0** | 融合 v2.0 | **0.004604** | 0.0384 | ✅ |
+| 7-10 | 得分融合 v1.0 (4组) | 融合 v1.0 | 0.0054~0.0095 | — | ❌ 均失败 |
+| — | 时序事件边界 | 思路二 | 0.008871 | 0.0612 | ❌ 已废弃 |
+| — | AE 重建误差 | 思路三 | ~0.007~0.008 | — | ❌ 已废弃 |
+
+**随机基线**：~0.007229（参考值）
+
+### 关键结论
+
+1. **密度过滤 FPS 全局最优**：标准 FPS 容易选到孤立噪声点，k-NN 局部密度过滤剔除 15% 最稀疏点后补齐，效果最好（MSE 0.003792）。
+2. **v1.1 + PCA 400d 紧随其后**：K-Means 聚类 + 动态保底 + PCA 降维去噪，MSE 0.003835，与密度过滤 FPS 差距极小。
+3. **分层融合无法超越单一最优**：cr2.0 (0.004004) 介于 v1.1 和标准 FPS 之间，cr3.0 (0.004604) 反而更差。说明 v1.1 粗筛的"信息漏斗"效应无法被 FPS 精筛弥补。
+4. **得分融合 v1.0 失败**：`s_v1`（语义离群）和 `s_fps`（几何离群）都倾向选离群帧，线性加权后双重强调噪声。
+5. **时序和 AE 思路废弃**：单任务时序耦合过强、CLIP 特征太规整导致重建误差无区分度。
+
+### 运行各思路实验
+
+```bash
+cd PROJECT
+venv\Scripts\activate
+
+# 思路一：v1.1 + PCA 400d
+python -m approaches.redundancy_distribution.scripts.run_v1_1_pca
+
+# 思路四：FPS 系列
+python -m approaches.farthest_point_sampling.scripts.run_fps
+python -m approaches.farthest_point_sampling.scripts.run_fps_fast
+python -m approaches.farthest_point_sampling.scripts.run_density_filtered_fps
+
+# 融合思路
+python -m approaches.fusion_score_weighted.scripts.run_hierarchical_fusion
+```
 
 ---
 
@@ -416,4 +458,4 @@ python extract_features.py
 
 ---
 
-*项目代码已更新至 v2.0（CLIP + 进阶算法）。按顺序运行 `extract_features.py` → `run_baseline.py` → `run_ablation.py` → `run_coreset.py` → `compare_results.py` 即可获得完整实验结果。祝实验顺利！*
+*项目已更新至 v2.0（CLIP + 进阶算法），approaches/ 目录包含全部核心集选择实验。全局最优方法：**密度过滤 FPS**（Test MSE 0.003792）。按顺序运行 `extract_features.py` → `run_baseline.py` → `run_ablation.py` → `run_coreset.py` → `compare_results.py` 即可获得完整实验结果。祝实验顺利！*
