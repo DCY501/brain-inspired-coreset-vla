@@ -159,6 +159,58 @@ candidates = v1_selector.select(features, episode_indices, n_clusters=fixed_n_cl
 
 ---
 
+## v3.0：互补后处理融合（新尝试）
+
+> **思路**：以全局最优的密度过滤 FPS 为基础集，用 v1.1 语义聚类检查"语义盲区"，对低覆盖率簇进行针对性补充，替换基础集中最冗余的帧。
+>
+> 与分层融合的根本区别：
+>   - 分层融合：v1.1 粗筛 → FPS 精筛（信息漏斗，不可逆）
+>   - 互补融合：FPS 全局基础 → v1.1 盲区检查 → 局部微调（信息完整保留）
+
+### 动机
+
+密度过滤 FPS 的全局最优性（0.003792）依赖于全局 k-NN 密度估计，不能嵌入子空间。因此让 FPS 在全局运行，v1.1 只做"盲区检查+微调"。
+
+**假设**：密度过滤 FPS 强在几何覆盖但可能有语义盲区；v1.1 的语义聚类能发现这些盲区，用盲区中 v1.1 得分最高的帧替换 FPS 中最冗余（密度最高）的帧，实现互补。
+
+### 机制
+
+```
+Step 1: 密度过滤 FPS 全局选出 1600 帧（保留全局最优性）
+Step 2: v1.1 对全局 16000 帧做 PCA 400d + K-Means 聚类（533 簇）
+Step 3: 检查每个语义簇在 FPS 结果中的覆盖率
+Step 4: 对覆盖率 < threshold 的"语义盲区簇"：
+        → 从该簇中选出 v1.1 得分最高且不在 FPS 中的帧
+        → 从 FPS 结果中找出密度最高（k-NN 距离最小 = 最冗余）的帧
+        → 替换
+Step 5: 保持总帧数 1600 不变
+```
+
+### 实验结果
+
+| 版本 | coverage_threshold | 盲区簇数 | 替换帧数 | Test MSE | vs 密度过滤 FPS | vs 分层融合 cr2.0 |
+|------|-------------------|---------|---------|---------|----------------|-----------------|
+| **密度过滤 FPS** | — | — | — | **0.003792** | — | — |
+| **互补融合** | **0.05** | **138** | **138** | **0.004429** | ↑16.8% ❌ | ↑10.6% ❌ |
+
+### 结果分析
+
+1. **语义盲区确实存在**：在 533 个语义簇中，有 138 个簇的覆盖率 < 5%，说明密度过滤 FPS 确实遗漏了大量语义簇。
+
+2. **但补充盲区没有提升性能**：替换 138 帧后 MSE 从 0.003792 上升到 0.004429，反而更差。
+
+3. **原因分析**：
+   - **语义稀有 ≠ 动作预测价值高**：v1.1 得分高的帧代表"语义稀有"，但这对动作预测任务的价值有限
+   - **破坏了几何覆盖完整性**：被替换出去的帧虽然是"最冗余"的（密度最高），但它们在密度过滤 FPS 中被选中是有原因的——它们可能是几何覆盖的关键点
+   - **边际收益为负**：密度过滤 FPS 的"信息完整性"已经足够好，语义补充带来的边际收益为负
+
+4. **关键洞察**：
+   - 密度过滤 FPS 的"冗余"定义（局部密度高）比 v1.1 的"语义稀有"更贴近动作预测的需求
+   - 单一最优方法的信息完整性已经足够，额外的语义补充反而引入噪声
+   - **融合的上限不是信息缺失，而是信息相关性**：即使发现了盲区，如果盲区信息对目标任务无关，补充也是无效的
+
+---
+
 ## 总体结论
 
 ### 融合思路最终排名
@@ -170,6 +222,7 @@ candidates = v1_selector.select(features, episode_indices, n_clusters=fixed_n_cl
 | **分层融合 cr2.0** | **融合 v2.0** | **0.004004** | ✅ 融合最佳，但仍不如单一最优 |
 | 分层融合 cr3.0 | 融合 v2.0 | 0.004604 | ✅ 候选池过大反而更差 |
 | 分层融合 cr2.0_dfps | 融合 v2.0 | 0.005272 | ❌ 密度过滤 FPS 在子空间内失效 |
+| **互补融合 v3.0** | **融合 v3.0** | **0.004429** | ❌ 语义盲区补充无效 |
 | 得分融合 v1.0 | 融合 v1.0 | 0.005434（最好） | ❌ 静态得分融合失败 |
 
 ### 核心洞察
@@ -182,9 +235,16 @@ candidates = v1_selector.select(features, episode_indices, n_clusters=fixed_n_cl
 
 3. **信息漏斗是分层融合的根本瓶颈**：v1.1 粗筛作为"信息漏斗"，无论候选池多大，都会过滤掉部分全局最优帧。FPS 精筛只能在漏斗后的子空间内优化，无法突破漏斗的上限。
 
-4. **未来方向**：若要真正超越单一最优，需要：
+4. **融合的上限不是信息缺失，而是信息相关性**：
+   - 互补融合发现了 138 个语义盲区，但补充这些盲区帧对动作预测没有帮助
+   - **语义稀有 ≠ 动作预测价值高**：v1.1 得分高的帧代表语义稀有，但对动作预测任务的价值有限
+   - 密度过滤 FPS 的"冗余"定义（局部密度高）比 v1.1 的"语义稀有"更贴近动作预测的需求
+   - 单一最优方法的信息完整性已经足够，额外的语义补充反而引入噪声、破坏几何覆盖
+
+5. **未来方向**：若要真正超越单一最优，需要：
    - 找到与空间覆盖真正正交的信号（如不确定性、梯度范数）
    - 或设计可逆/可恢复的分层结构（如候选池保留被过滤帧的优先级信息）
+   - **更重要的**：确保补充的信息与目标任务（动作预测）高度相关，而非仅仅是语义稀有
 
 ---
 
@@ -195,10 +255,12 @@ approaches/fusion_score_weighted/
 ├── README.md                          # 本文件（融合思路完整记录）
 ├── src/
 │   ├── selector_score_fusion.py       # v1.0：得分加权融合选择器（已废弃）
-│   └── selector_hierarchical_fusion.py # v2.0：分层融合选择器
+│   ├── selector_hierarchical_fusion.py # v2.0：分层融合选择器
+│   └── selector_complementary_fusion.py # v3.0：互补后处理融合选择器
 ├── scripts/
 │   ├── run_score_fusion.py            # v1.0 多组合实验脚本
-│   └── run_hierarchical_fusion.py   # v2.0 分层融合实验脚本
+│   ├── run_hierarchical_fusion.py     # v2.0 分层融合实验脚本
+│   └── run_complementary_fusion.py    # v3.0 互补融合实验脚本
 └── results/
     # v1.0 得分融合结果
     ├── fusion_a0.5_b0.3_g0.2_result_seed42.json    # v1.1主导: 0.005645
@@ -211,7 +273,10 @@ approaches/fusion_score_weighted/
     ├── hierarchical_cr2.0_dfps_result_seed42.json    # cr2.0 密度过滤 FPS: 0.005272
     ├── hierarchical_cr2.0_dfps_seed42.pt           # cr2.0_dfps 模型权重
     ├── hierarchical_cr3.0_result_seed42.json         # cr3.0: 0.004604
-    └── hierarchical_cr3.0_seed42.pt                # cr3.0 模型权重
+    ├── hierarchical_cr3.0_seed42.pt                # cr3.0 模型权重
+    # v3.0 互补融合结果
+    ├── complementary_ct0.05_result_seed42.json       # ct0.05: 0.004429
+    └── complementary_ct0.05_seed42.pt              # ct0.05 模型权重
 ```
 
 ## 运行方式
@@ -225,6 +290,9 @@ python -m approaches.fusion_score_weighted.scripts.run_score_fusion
 
 # v2.0 分层融合（cr2.0 + cr3.0）
 python -m approaches.fusion_score_weighted.scripts.run_hierarchical_fusion
+
+# v3.0 互补融合（ct0.05）
+python -m approaches.fusion_score_weighted.scripts.run_complementary_fusion
 ```
 
 ---
