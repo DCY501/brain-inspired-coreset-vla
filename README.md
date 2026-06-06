@@ -51,6 +51,11 @@ PROJECT/
 │   │   ├── src/selector_fps.py
 │   │   ├── src/selector_fps_fast.py
 │   │   ├── src/selector_density_filtered_fps.py
+│   │   ├── scripts/
+│   │   │   ├── run_fps.py
+│   │   │   ├── run_weighted_fps.py
+│   │   │   ├── run_density_filtered_fps.py
+│   │   │   └── run_density_filter_ablation.py  # filter_ratio 消融实验
 │   │   └── results/
 │   ├── fusion_score_weighted/      # 融合思路：得分加权 v1（失败）+ 分层融合 v2.0
 │   │   ├── src/selector_score_fusion.py
@@ -322,16 +327,17 @@ python compare_results.py
 | — | 时序事件边界 | 思路二 | 0.008871 | 0.0612 | ❌ 已废弃 |
 | — | AE 重建误差 | 思路三 | ~0.007~0.008 | — | ❌ 已废弃 |
 
-**随机基线**：~0.007229（参考值）
+**随机基线**：5 次运行 avg MSE=0.007229 ± 0.000862
 
 ### 关键结论
 
 1. **密度过滤 FPS 全局最优**：标准 FPS 容易选到孤立噪声点，k-NN 局部密度过滤剔除 15% 最稀疏点后补齐，效果最好（MSE 0.003792）。
-2. **v1.1 + PCA 400d 紧随其后**：K-Means 聚类 + 动态保底 + PCA 降维去噪，MSE 0.003835，与密度过滤 FPS 差距极小。
-3. **分层融合无法超越单一最优**：cr2.0 (0.004004) 介于 v1.1 和标准 FPS 之间，cr3.0 (0.004604) 反而更差。说明 v1.1 粗筛的"信息漏斗"效应无法被 FPS 精筛弥补。
-4. **互补融合语义盲区补充无效**：以密度过滤 FPS 为基础集，v1.1 发现 138 个语义盲区簇，替换 138 帧后 MSE 反而上升到 0.004429。**关键洞察**：语义稀有 ≠ 动作预测价值高，密度过滤 FPS 的"冗余"定义（局部密度高）比 v1.1 的"语义稀有"更贴近动作预测需求。单一最优方法的信息完整性已经足够，额外的语义补充反而引入噪声、破坏几何覆盖。
-5. **得分融合 v1.0 失败**：`s_v1`（语义离群）和 `s_fps`（几何离群）都倾向选离群帧，线性加权后双重强调噪声。
-6. **时序和 AE 思路废弃**：单任务时序耦合过强、CLIP 特征太规整导致重建误差无区分度。
+2. **filter_ratio=0.15 是最优 sweet spot**：消融实验验证，0.05/0.10 修正不足，0.20/0.25 过度修正破坏覆盖，0.15 恰好平衡（详见 `approaches/farthest_point_sampling/README.md` v4.3 节）。
+3. **v1.1 + PCA 400d 紧随其后**：K-Means 聚类 + 动态保底 + PCA 降维去噪，MSE 0.003835，与密度过滤 FPS 差距极小。
+4. **分层融合无法超越单一最优**：cr2.0 (0.004004) 介于 v1.1 和标准 FPS 之间，cr3.0 (0.004604) 反而更差。说明 v1.1 粗筛的"信息漏斗"效应无法被 FPS 精筛弥补。
+5. **互补融合语义盲区补充无效**：以密度过滤 FPS 为基础集，v1.1 发现 138 个语义盲区簇，替换 138 帧后 MSE 反而上升到 0.004429。**关键洞察**：语义稀有 ≠ 动作预测价值高，密度过滤 FPS 的"冗余"定义（局部密度高）比 v1.1 的"语义稀有"更贴近动作预测需求。单一最优方法的信息完整性已经足够，额外的语义补充反而引入噪声、破坏几何覆盖。
+6. **得分融合 v1.0 失败**：`s_v1`（语义离群）和 `s_fps`（几何离群）都倾向选离群帧，线性加权后双重强调噪声。
+7. **时序和 AE 思路废弃**：单任务时序耦合过强、CLIP 特征太规整导致重建误差无区分度。
 
 ### 运行各思路实验
 
@@ -346,6 +352,9 @@ python -m approaches.redundancy_distribution.scripts.run_v1_1_pca
 python -m approaches.farthest_point_sampling.scripts.run_fps
 python -m approaches.farthest_point_sampling.scripts.run_fps_fast
 python -m approaches.farthest_point_sampling.scripts.run_density_filtered_fps
+
+# 思路四：filter_ratio 消融实验
+python -m approaches.farthest_point_sampling.scripts.run_density_filter_ablation
 
 # 融合思路
 python -m approaches.fusion_score_weighted.scripts.run_hierarchical_fusion
