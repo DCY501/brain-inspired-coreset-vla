@@ -1,53 +1,56 @@
-# ==================== Python ====================
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+*.egg-info/
+dist/
+build/
 
-# ==================== Virtual Environments ====================
+# Virtual environment
 venv/
 .env/
-env/
-ENV/
 
-# ==================== Data & Model Artifacts ====================
-# 大文件：离线特征、模型权重、原始数据集
-data/features/*.npy
-data/processed/*.pt
-data/processed/*.pth
-data/processed/*.ckpt
-data/processed/*.json
+# Data
 data/raw/
+data/processed/
+data/features/*.npy
+*.pt
+*.pth
 
-# HuggingFace / 模型缓存
+# Hugging Face cache
 hf_cache/
-model_cache/
 
-# ==================== Logs & Temp ====================
+# Logs
 *.log
-*.tmp
-*.temp
-*.swp
-*.swo
-*~
+runs/
 
-# ==================== IDE & Tools ====================
+# LaTeX auxiliary files
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.pdf
+_minted/
+*.data.minted
+
+# SVG intermediate files
+report/svg-inkscape/
+report/photo/*.svg
+report/photo/test.excalidraw
+report/photo/*_old.png
+
+# Report drafts
+report/报告框架.md
+
+# IDE
 .vscode/
 .idea/
-*.sublime-*
+*.swp
+*.swo
 
-# Jupyter
-.ipynb_checkpoints/
-
-# Testing
-.pytest_cache/
-htmlcov/
-.coverage
-.mypy_cache/
-
-# ==================== OS ====================
+# OS
 .DS_Store
 Thumbs.db
-desktop.ini
-Desktop.ini

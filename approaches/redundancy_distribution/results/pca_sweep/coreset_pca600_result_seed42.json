@@ -1,6 +1,7 @@
 {
-  "method": "brain_inspired_coreset",
+  "method": "brain_inspired_coreset_v1.1_pca600",
   "seed": 42,
+  "pca_components": 600,
   "test_mse": 0.004686130676418543,
   "test_mae": 0.03743349760770798,
   "dim_mse": [
