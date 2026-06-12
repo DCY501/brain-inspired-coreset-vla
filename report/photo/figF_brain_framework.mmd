@@ -1,0 +1,44 @@
+graph TD
+    subgraph 脑机制启发
+        A[预测编码<br/>Predictive Coding]
+        B[RAS 网状激活<br/>RAS Arousal]
+        C[事件分割<br/>Event Segmentation]
+        D[意外检测<br/>Novelty Detection]
+        E[海马体空间编码<br/>Spatial Coverage]
+    end
+
+    subgraph 冗余定义
+        F[动作变化率低 = 时序冗余]
+        G[特征空间聚集 = 分布冗余]
+        H[预测误差小 = 时序冗余]
+        I[重建误差小 = 压缩冗余]
+        J[空间分布稀疏 = 几何冗余]
+    end
+
+    subgraph 核心集算法
+        K[动作变化率事件边界]
+        L[K-Means 聚类 + 动态配额 + PCA]
+        M[滑动窗口自回归预测]
+        N[自编码器重建误差]
+        O[密度过滤最远点采样 FPS]
+    end
+
+    subgraph 实验结果
+        P[MSE 0.008871 失败]
+        Q[MSE 0.003835 成功]
+        R[MSE 0.005688 有效但有限]
+        S[MSE 0.007292 失败]
+        T[MSE 0.003792 最优]
+    end
+
+    A --> H --> M --> R
+    B --> G --> L --> Q
+    C --> F --> K --> P
+    D --> I --> N --> S
+    E --> J --> O --> T
+
+    style P fill:#ffcccc
+    style S fill:#ffcccc
+    style R fill:#fff4cc
+    style Q fill:#ccffcc
+    style T fill:#ccffcc,stroke:#2ecc71,stroke-width:3px

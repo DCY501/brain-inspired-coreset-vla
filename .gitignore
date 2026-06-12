@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+venv/
+.env/
+
+# Data
+data/raw/
+data/processed/
+data/features/*.npy
+*.pt
+*.pth
+
+# Hugging Face cache
+hf_cache/
+
+# Logs
+*.log
+runs/
+
+# LaTeX auxiliary files
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.pdf
+_minted/
+*.data.minted
+
+# SVG intermediate files
+report/svg-inkscape/
+report/photo/*.svg
+report/photo/test.excalidraw
+report/photo/*_old.png
+
+# Report drafts
+report/报告框架.md
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
