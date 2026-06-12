@@ -35,7 +35,6 @@ PROJECT/
 │   ├── predictive_coding_sliding_window/  # 预测编码
 │   └── fusion_score_weighted/      # 融合策略
 ├── scripts/                    # 特征提取、基线、对比脚本
-├── report/                     # 论文报告与图表
 ├── requirements.txt
 └── README.md
 ```
@@ -101,6 +100,12 @@ python compare_results.py
 | — | 随机基线 | — | 0.007229 | — |
 | — | 时序事件边界 | 时序冗余 | 0.008871 | ↑22.7% |
 | — | AE 重建误差 | 压缩冗余 | ~0.007 | ~0% |
+
+---
+
+## 完整实验记录
+
+全部模型权重、训练结果、论文报告与中间数据请参见 [`backup`](https://github.com/DCY501/brain-inspired-coreset-vla/tree/backup) 分支。
 
 ---
 
